@@ -76,6 +76,7 @@ fn get_service_name(entry: DirEntry) -> Result<String> {
         }
         return Ok(split_name[0].to_string());
     }
+    
     Err(anyhow!(
         "file name at {} is not valid unicode",
         entry.path().display()

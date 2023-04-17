@@ -4,7 +4,7 @@
 
 ## sminit manager
 
-- should concurrently handle tracked services
+<!-- - should concurrently handle tracked services
 - each worker should handle a service in a separate thread
 - each worker should have a communication path with the manager to receive instructions.
 - manager should also be able to handle multiple requests concurrently.
@@ -22,4 +22,14 @@
 - two actors should be able to send a signal to a service:
   - the manager
   - another service
-- the manager shoulb be the the access point to a service's senders.
+- the manager shoulb be the the access point to a service's senders. -->
+
+- sminit manager's main job is to handle services
+- an external actor could ask the manager for the following:
+  - track a new service based on a service definition
+  - start a tracked service (start the process)
+  - stop a tracked service (stop the process, but process info is still in memory)
+  - delete a tracked service
+- the manager should guarantee thread safety, since multiple actors could send requests to the manager at a time
+- there should be a server exposing the manager's functionality to external actors
+- users could send requests to the server by using a cli
