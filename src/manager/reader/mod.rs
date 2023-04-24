@@ -4,6 +4,7 @@ use std::{
     io::Read,
     path::Path,
     result::Result::Ok,
+    sync::Arc,
 };
 
 use anyhow::{anyhow, Result};
@@ -19,11 +20,11 @@ fn read_service_options<R: Read>(name: String, reader: R) -> Result<ServiceOpts>
 pub fn try_read_service(name: String, dir_path: &Path) -> Result<ServiceOpts> {
     // ReadService tries to read a service with name `name` inside a directory located at `path`.
     // first it tries to find `path`/`name`.`yaml` then tries to find `path`/`name`.yml`.
-    let path = dir_path.join(Path::new(&format!("{}.yaml", name)));
+    let path = dir_path.join(Path::new(&format!("{name}.yaml")));
     if let Ok(file) = File::open(path) {
         return read_service_options(name, file);
     }
-    let path = dir_path.join(Path::new(&format!("{}.yml", name)));
+    let path = dir_path.join(Path::new(&format!("{name}.yml")));
     if let Ok(file) = File::open(path) {
         return read_service_options(name, file);
     }
@@ -35,7 +36,7 @@ pub fn try_read_service(name: String, dir_path: &Path) -> Result<ServiceOpts> {
     ))
 }
 
-pub fn read_all(dir_path: &Path) -> Result<HashMap<String, ServiceOpts>> {
+pub fn read_all(dir_path: &Path) -> Result<HashMap<String, Arc<ServiceOpts>>> {
     // this should read all service configuration files from dir_path, return a vector of service options
     let mut options = HashMap::new();
     let entries = fs::read_dir(dir_path)?;
@@ -53,7 +54,7 @@ pub fn read_all(dir_path: &Path) -> Result<HashMap<String, ServiceOpts>> {
         let file = File::open(dir_entry.path())?;
         let service_name = get_service_name(dir_entry)?;
         let opts = read_service_options(service_name, file)?;
-        options.insert(opts.name.clone(), opts);
+        options.insert(opts.name.clone(), Arc::new(opts));
     }
 
     Ok(options)
@@ -61,7 +62,7 @@ pub fn read_all(dir_path: &Path) -> Result<HashMap<String, ServiceOpts>> {
 
 fn get_service_name(entry: DirEntry) -> Result<String> {
     if let Some(file_name) = entry.file_name().to_str() {
-        let split_name: Vec<&str> = file_name.split(".").collect();
+        let split_name: Vec<&str> = file_name.split('.').collect();
         if split_name.len() != 2 {
             return Err(anyhow!(
                 "file {} name is invalid. should be <name>.<yaml/yml>",
@@ -76,7 +77,7 @@ fn get_service_name(entry: DirEntry) -> Result<String> {
         }
         return Ok(split_name[0].to_string());
     }
-    
+
     Err(anyhow!(
         "file name at {} is not valid unicode",
         entry.path().display()
@@ -93,6 +94,7 @@ mod test {
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Write;
+    use std::sync::Arc;
     use tempfile::{NamedTempFile, TempDir};
 
     #[test]
@@ -124,7 +126,7 @@ mod test {
             let file_name = format!("{}.yaml", opts.name);
             let tmpfile = File::create(tmpdir.path().join(file_name)).unwrap();
             serde_yaml::to_writer(tmpfile, &opts).unwrap();
-            given_options_map.insert(opts.name.clone(), opts);
+            given_options_map.insert(opts.name.clone(), Arc::new(opts));
         }
 
         let got_options_map = read_all(tmpdir.path()).unwrap();
