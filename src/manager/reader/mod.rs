@@ -4,20 +4,19 @@ use std::{
     io::Read,
     path::Path,
     result::Result::Ok,
-    sync::Arc,
 };
 
 use anyhow::{anyhow, Result};
 
 use super::ServiceOpts;
 
-fn read_service_options<R: Read>(name: String, reader: R) -> Result<ServiceOpts> {
+fn read_service_options<R: Read>(name: &str, reader: R) -> Result<ServiceOpts> {
     let mut opts: ServiceOpts = serde_yaml::from_reader(reader)?;
-    opts.name = name;
+    opts.name = String::from(name);
     Ok(opts)
 }
 
-pub fn try_read_service(name: String, dir_path: &Path) -> Result<ServiceOpts> {
+pub fn try_read_service(name: &str, dir_path: &Path) -> Result<ServiceOpts> {
     // ReadService tries to read a service with name `name` inside a directory located at `path`.
     // first it tries to find `path`/`name`.`yaml` then tries to find `path`/`name`.yml`.
     let path = dir_path.join(Path::new(&format!("{name}.yaml")));
@@ -36,7 +35,7 @@ pub fn try_read_service(name: String, dir_path: &Path) -> Result<ServiceOpts> {
     ))
 }
 
-pub fn read_all(dir_path: &Path) -> Result<HashMap<String, Arc<ServiceOpts>>> {
+pub fn read_all(dir_path: &Path) -> Result<HashMap<String, ServiceOpts>> {
     // this should read all service configuration files from dir_path, return a vector of service options
     let mut options = HashMap::new();
     let entries = fs::read_dir(dir_path)?;
@@ -53,8 +52,8 @@ pub fn read_all(dir_path: &Path) -> Result<HashMap<String, Arc<ServiceOpts>>> {
         }
         let file = File::open(dir_entry.path())?;
         let service_name = get_service_name(dir_entry)?;
-        let opts = read_service_options(service_name, file)?;
-        options.insert(opts.name.clone(), Arc::new(opts));
+        let opts = read_service_options(&service_name, file)?;
+        options.insert(service_name, opts);
     }
 
     Ok(options)
@@ -94,7 +93,7 @@ mod test {
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Write;
-    use std::sync::Arc;
+    
     use tempfile::{NamedTempFile, TempDir};
 
     #[test]
@@ -103,7 +102,7 @@ mod test {
         let mut tmpfile = NamedTempFile::new().unwrap();
         tmpfile.write_all(b"\ncmd: echo hi\nhealth_check: sleep 1\ncombine_log: false\none_shot: false\nafter: \n - s1\n - s2").unwrap();
         let file = tmpfile.reopen().unwrap();
-        let opts = read_service_options(name.to_string(), file).unwrap();
+        let opts = read_service_options(name, file).unwrap();
         let given = ServiceOpts {
             name: "s1".to_string(),
             cmd: "echo hi".to_string(),
@@ -126,7 +125,7 @@ mod test {
             let file_name = format!("{}.yaml", opts.name);
             let tmpfile = File::create(tmpdir.path().join(file_name)).unwrap();
             serde_yaml::to_writer(tmpfile, &opts).unwrap();
-            given_options_map.insert(opts.name.clone(), Arc::new(opts));
+            given_options_map.insert(opts.name.clone(), opts);
         }
 
         let got_options_map = read_all(tmpdir.path()).unwrap();
